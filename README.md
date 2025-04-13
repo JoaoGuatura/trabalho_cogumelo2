@@ -64,4 +64,4 @@ Training complete. Model object: KNeighborsClassifier(algorithm='auto', leaf_siz
 18                      Use GPU             False <br>
 19               Log Experiment             False <br>
 20              Experiment Name  clf-default-name <br>
-21                          USI              f91d <br>s
+21                          USI              f91d <br>
