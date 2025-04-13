@@ -1,0 +1,25 @@
+# Ignorar a pasta do ambiente virtual
+venv/
+.venv/
+env/
+sklearn-env/
+.sklearn-env/
+
+# Ignorar arquivos gerados pelo Python
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+*.db
+*.sqlite3
+
+# Ignorar arquivos de configuração local
+.env
+.vscode/
+.idea/
+
+# Ignorar arquivos de dados grandes ou sensíveis
+data/
+*.csv
+*.json
+*.xlsx
