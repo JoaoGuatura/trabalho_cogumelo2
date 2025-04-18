@@ -1,6 +1,24 @@
 # trabalho_cogumelo2
 # Resultados Treinamentos
 
+## Requisitos
+
+- Python 3.11.6
+- pip
+
+## Como rodar
+
+# Criar ambiente virtual
+python -m venv venv
+.\venv\Scripts\activate
+
+# Instalar dependências
+pip install -r requirements.txt
+
+# Rodar o pipeline
+python main.py train
+python main.py visualize --clean-data data/mushrooms_edited.csv
+
 Model  Accuracy     AUC  Recall   Prec.  \ <br>
 knn                K Neighbors Classifier    1.0000  1.0000  1.0000  1.0000 <br>
 svm                   SVM - Linear Kernel    1.0000  1.0000  1.0000  1.0000 <br>

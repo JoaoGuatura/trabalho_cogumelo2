@@ -1,85 +1,98 @@
+import pandas as pd
 import argparse
 import sys
 import logging
+import os
+from pathlib import Path
 
 # Adapters
 from adapters.kaggle_downloader_adapter import KaggleDownloaderAdapter
 from adapters.ydata_profiling_adapter import YDataProfilingAdapter
 from adapters.dtale_adapter import DtaleAdapter
 from adapters.pycaret_adapter import PyCaretAdapter
+from visualizations import generate_visualizations
 
 # Application
 from application.use_cases import MLUseCases
 
-# Configure basic logging
+# Configuração de logging
 logging.basicConfig(
     level=logging.INFO,
     format="%(asctime)s [%(levelname)s] %(message)s",
+    handlers=[
+        logging.FileHandler("logs/pipeline.log"),
+        logging.StreamHandler()
+    ]
 )
 logger = logging.getLogger(__name__)
 
+def setup_directories():
+    """Cria estrutura de diretórios necessária"""
+    os.makedirs("data", exist_ok=True)
+    os.makedirs("models", exist_ok=True)
+    os.makedirs("reports", exist_ok=True)
+    os.makedirs("logs", exist_ok=True)
+
 def main():
-    parser = argparse.ArgumentParser(description="Hexagonal ML Pipeline CLI")
-    subparsers = parser.add_subparsers(dest="command")
+    setup_directories()
     
-    # download
-    dl_parser = subparsers.add_parser("download", help="Download dataset from Kaggle")
-    dl_parser.add_argument("kaggle_name", help="Kaggle dataset name (e.g. uciml/mushroom-classification)")
+    parser = argparse.ArgumentParser(description="Pipeline de ML para classificação de cogumelos")
+    subparsers = parser.add_subparsers(dest="command", required=True)
     
-    # profile
-    profile_parser = subparsers.add_parser("profile", help="Generate profiling report")
-    profile_parser.add_argument("csv_filename", help="Which CSV file to profile (in data/)?")
+    # Comando para pré-processamento
+    preprocess_parser = subparsers.add_parser("preprocess", help="Pré-processa o dataset original")
+    preprocess_parser.add_argument("input_csv", help="Caminho para o arquivo mushrooms.csv original")
     
-    # edit (Dtale)
-    edit_parser = subparsers.add_parser("edit", help="Open data in Dtale and (optionally) save edits")
-    edit_parser.add_argument("csv_filename", help="Which CSV file to edit (in data/)?")
-    
-    # train
-    train_parser = subparsers.add_parser("train", help="Train a model using PyCaret")
-    train_parser.add_argument("csv_filename", help="CSV in data/ to use for training")
-    train_parser.add_argument("target_col", help="Target column (if classification/regression)")
-    train_parser.add_argument("task_type", help="classification, regression, or clustering")
+    # Comando para treinamento
+    train_parser = subparsers.add_parser("train", help="Treina o modelo SVM Linear")
+    train_parser.add_argument("--clean-data", default="mushrooms_edited.csv",
+                            help="Caminho para os dados pré-processados")
+
+    # Comando para visualização
+    viz_parser = subparsers.add_parser("visualize", help="Gera gráficos exploratórios")
+    viz_parser.add_argument("--clean-data", default="mushrooms_edited.csv",
+                            help="Caminho para os dados pré-processados")
     
     args = parser.parse_args()
     
-    # Instantiate adapters
-    kaggle_adapter = KaggleDownloaderAdapter()     
-    profiler_adapter = YDataProfilingAdapter()
+    # Inicializa adapters
     dtale_adapter = DtaleAdapter()
     training_adapter = PyCaretAdapter()
     
-    # Create the use-case orchestrator with the chosen adapters
     ml_use_cases = MLUseCases(
-        dataset_adapter=kaggle_adapter,
-        profiler_adapter=profiler_adapter,
+        dataset_adapter=None,
+        profiler_adapter=None,
         dtale_adapter=dtale_adapter,
         training_adapter=training_adapter
     )
     
-    if args.command == "download":
-        logger.info("Authenticating with Kaggle...")
-        kaggle_adapter.authenticate()
-        logger.info("Authentication successful. Now downloading dataset...")
-        ml_use_cases.download_dataset(args.kaggle_name, "data")
-        logger.info("Download step finished.")
-    
-    elif args.command == "profile":
-        logger.info(f"Generating ydata_profiling report for {args.csv_filename}...")
-        ml_use_cases.profile_data(args.csv_filename)
-        logger.info("Profile report generated. Check the current folder for an HTML file.")
-    
-    elif args.command == "edit":
-        logger.info(f"Launching Dtale to edit {args.csv_filename}...")
-        ml_use_cases.edit_data(args.csv_filename)
-        logger.info(f"Dtale session opened. Check your console for the local Dtale URL.")
-    
+    if args.command == "preprocess":
+        logger.info("Iniciando pré-processamento...")
+        ml_use_cases.preprocess_data(args.input_csv)
+        logger.info("Pré-processamento concluído. Dados salvos em data/mushrooms_clean.csv")
+        
     elif args.command == "train":
-        logger.info(f"Training a model on {args.csv_filename} | Target: {args.target_col} | Task: {args.task_type}")
-        ml_use_cases.train_model(args.csv_filename, args.target_col, args.task_type)
-        logger.info("Training complete.")
-    
-    else:
-        parser.print_help()
+        logger.info("Iniciando treinamento do SVM Linear...")
+        ml_use_cases.train_model(args.clean_data, target_col='class', task_type='classification')
+
+        logger.info("""
+        Treinamento concluído!
+        Modelo salvo em: models/best_mushroom_model
+        Relatórios em: reports/
+        """)
+
+    elif args.command == "visualize":
+        logger.info("Gerando visualizações exploratórias...")
+        if not os.path.exists(args.clean_data):
+            logger.error(f"Arquivo não encontrado: {args.clean_data}")
+            sys.exit(1)
+        df = pd.read_csv(args.clean_data)
+        generate_visualizations(df)
+        logger.info("Visualizações salvas na pasta 'reports/'.")
 
 if __name__ == "__main__":
-    main()
+    try:
+        main()
+    except Exception as e:
+        logger.error(f"Falha na execução: {str(e)}")
+        sys.exit(1)

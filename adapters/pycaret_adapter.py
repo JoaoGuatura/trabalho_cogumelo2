@@ -1,34 +1,73 @@
-# adapters/pycaret_adapter.py
 import pandas as pd
 from ports.training_port import TrainingPort
-
-# PyCaret tasks
-from pycaret.classification import setup as class_setup, compare_models as class_compare
-from pycaret.regression import setup as reg_setup, compare_models as reg_compare
-from pycaret.clustering import setup as clus_setup, create_model as clus_create
+from pycaret.classification import (
+    setup as class_setup,
+    compare_models as class_compare,
+    create_model,
+    save_model,
+    plot_model,
+    interpret_model
+)
+import matplotlib.pyplot as plt
+import os
 
 class PyCaretAdapter(TrainingPort):
     def train_model(self, df: pd.DataFrame, target: str, task_type: str):
         """
-        Use PyCaret to train. We'll just return the best model object.
+        Treina o modelo e gera artefatos (plots, modelo salvo)
         """
         if task_type == "classification":
-            class_setup(data=df, target=target, session_id=123, html=False)
-            best_model = class_compare()
-            print("Best Classification Model:", best_model)
-            return best_model
-        
-        elif task_type == "regression":
-            reg_setup(data=df, target=target, session_id=123, html=False)
-            best_model = reg_compare()
-            print("Best Regression Model:", best_model)
-            return best_model
-        
-        elif task_type == "clustering":
-            clus_setup(data=df, session_id=123, html=False)
-            best_model = clus_create("kmeans")
-            print("Clustering Model:", best_model)
-            return best_model
+            # Configuração do experimento
+            exp = class_setup(
+                data=df,
+                target=target,
+                session_id=123,
+                html=False,
+                log_plots=True,
+                verbose=False
+            )
+            
+            # Comparação de modelos
+            best_model = class_compare(sort='AUC', n_select=3)
+            
+            # Seleciona o SVM Linear (mais rápido entre os melhores)
+            svm_model = create_model('svm')
+            
+            # Geração de plots
+            self._generate_plots(svm_model)
+            
+            # Interpretação do modelo (SHAP)
+            self._interpret_model(svm_model)
+            
+            # Salva o modelo
+            os.makedirs('models', exist_ok=True)
+            save_model(svm_model, 'models/best_mushroom_model')
+            
+            return svm_model
         
         else:
-            raise ValueError("Invalid task_type. Choose classification, regression, or clustering.")
+            raise ValueError("Esta implementação foca apenas em classificação")
+
+    def _generate_plots(self, model):
+        """Gera e salva visualizações importantes"""
+        plots = {
+            'auc': 'ROC Curve',
+            'confusion_matrix': 'Confusion Matrix',
+            'feature': 'Feature Importance'
+        }
+        
+        for plot_type, name in plots.items():
+            try:
+                plot_model(model, plot=plot_type, save=True, scale=2)
+                plt.title(f"{name} - SVM Linear")
+                plt.savefig(f"reports/{plot_type}_plot.png", bbox_inches='tight')
+                plt.close()
+            except Exception as e:
+                print(f"Erro ao gerar plot {plot_type}: {str(e)}")
+
+    def _interpret_model(self, model):
+        """Gera análise SHAP e salva"""
+        try:
+            interpret_model(model, save='reports/shap_summary.html')
+        except Exception as e:
+            print(f"Erro na interpretação: {str(e)}")

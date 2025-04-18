@@ -4,6 +4,8 @@ venv/
 env/
 sklearn-env/
 .sklearn-env/
+venv2/
+.venv2/
 
 # Ignorar arquivos gerados pelo Python
 __pycache__/
